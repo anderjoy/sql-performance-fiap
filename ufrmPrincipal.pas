@@ -240,10 +240,14 @@ begin
       FDConnection1.Commit;
 
     except
-      if FDConnection1.InTransaction then begin
+      on E: Exception do begin
 
-        FDConnection1.Rollback;
+        if FDConnection1.InTransaction then begin
 
+          AddMsgLog('Error: ' + E.Message);
+
+          FDConnection1.Rollback;
+        end;
       end;
 
     end;
@@ -801,7 +805,7 @@ begin
         qryBoleto.Params[DSProduto].AsStrings[iDML]      := 'Descricao do produto';
         qryBoleto.Params[Observacoes].AsStrings[iDML]    := 'As observações vão aqui haha';
         qryBoleto.Params[DTVencimento].AsIntegers[iDML]  := StrToInt(FormatDateTime('yyyymmdd', IncDay(Now, iDML)));
-        qryBoleto.Params[Juros].AsBCDs[iDML]             := iDML * 0.46;
+        qryBoleto.Params[Juros].AsBCDs[iDML]             := 0.46;
 
         if (iItem + 1 mod 2) = 0 then begin
           TPPessoa := 'F';
@@ -876,7 +880,7 @@ begin
         qryBoleto.Params[DSProduto].AsStrings[iDML]      := 'Descricao do produto';
         qryBoleto.Params[Observacoes].AsStrings[iDML]    := 'As observações vão aqui haha';
         qryBoleto.Params[DTVencimento].AsIntegers[iDML]  := StrToInt(FormatDateTime('yyyymmdd', IncDay(Now, iDML)));
-        qryBoleto.Params[Juros].AsBCDs[iDML]             := iDML * 0.46;
+        qryBoleto.Params[Juros].AsBCDs[iDML]             := 0.46;
 
         if (iItem + 1 mod 2) = 0 then begin
           TPPessoa := 'F';
