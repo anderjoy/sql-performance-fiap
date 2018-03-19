@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2017/10/03 13:07:52.000.039,=C:\Users\ajesus\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2017/10/03 13:08:31.000.869,=C:\Users\ajesus\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2017/10/19 09:38:41.000.405,=C:\Users\ajesus\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2017/10/19 09:39:00.000.544,=C:\Users\ajesus\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2017/10/19 09:39:38.000.258,=C:\Users\ajesus\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2017/11/06 10:57:32.000.652,=C:\Users\ajesus\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2018/03/19 12:17:21.679,=C:\Users\ajesus\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2018/03/19 12:20:26.772,D:\lixo\Performance - FIAP\Gerador de dados\ufrmPrincipal.pas=C:\Users\ajesus\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2018/03/19 12:20:26.772,D:\lixo\Performance - FIAP\Gerador de dados\ufrmPrincipal.dfm=C:\Users\ajesus\Documents\Embarcadero\Studio\Projects\Unit1.dfm</Transaction>
+    <Transaction>2018/03/19 12:20:31.314,D:\lixo\Performance - FIAP\Gerador de dados\GeradorCarga.dproj=C:\Users\ajesus\Documents\Embarcadero\Studio\Projects\Project1.dproj</Transaction>
+  </Transactions>
+	<ActiveMobileDevice>
+		<NoProfile iOSSimulator="iPhone5"/>
+	</ActiveMobileDevice>
+</BorlandProject>
