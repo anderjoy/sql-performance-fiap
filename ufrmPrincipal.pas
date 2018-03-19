@@ -836,11 +836,13 @@ begin
     AddLogFim(qryBoleto.Params.ArraySize.ToString());
 
     qryBoleto.Params.ArraySize := 0;
+    Exit;
 
     //-------------------------------------------------------------------------\\
 
     AddLogInicio('Adicionando boletos originados de arquivo');
 
+    qryMensagens.Close;
     qryMensagens.Open(
       'SELECT IDArquivo ' +
       'FROM Arquivo ' +
@@ -874,12 +876,12 @@ begin
         qryBoleto.Params[IDArquivoRec].AsIntegers[iDML]  := qryMensagens.FieldByName('IDArquivo').AsInteger;
         qryBoleto.Params[LinhaDigitavel].AsStrings[iDML] := Zeros(iItem * 11, 35);
         qryBoleto.Params[CodBarras].AsStrings[iDML]      := Zeros(iItem * 12, 41);
-        qryBoleto.Params[Valor].AsBCDs[iDML]             := iDML * 2.98;
+        qryBoleto.Params[Valor].AsBCDs[iDML]             := 0.98;
         qryBoleto.Params[CDProduto].AsStrings[iDML]      := 'MCP';
         qryBoleto.Params[NMProduto].AsStrings[iDML]      := 'Alguma coisa';
         qryBoleto.Params[DSProduto].AsStrings[iDML]      := 'Descricao do produto';
         qryBoleto.Params[Observacoes].AsStrings[iDML]    := 'As observações vão aqui haha';
-        qryBoleto.Params[DTVencimento].AsIntegers[iDML]  := StrToInt(FormatDateTime('yyyymmdd', IncDay(Now, iDML)));
+        qryBoleto.Params[DTVencimento].AsIntegers[iDML]  := StrToInt(FormatDateTime('yyyymmdd', IncDay(Now, 1)));
         qryBoleto.Params[Juros].AsBCDs[iDML]             := 0.46;
 
         if (iItem + 1 mod 2) = 0 then begin
