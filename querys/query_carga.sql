@@ -18,12 +18,12 @@ INSERT INTO SITUACAO VALUES ('BP8', 'Boleto recebido com sucesso. Aguardando pag
 
 select count(1) as qtd from Cliente with (nolock)
 
-select * from Sequencia
+select * from Sequencia WITH (NOLOCK)
 select * from Cliente
-select * from Monitor
-select * from Mensagem
+select * from Monitor WITH (NOLOCK)
+select count(1) from Mensagem WITH (NOLOCK)
 select * from MensagemItem
-select * from Arquivo
-select * from Boleto
+select count(1) from Arquivo with (nolock)
+select count(1) from Boleto with (nolock)
 
 */
