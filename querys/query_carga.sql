@@ -13,6 +13,10 @@ INSERT INTO SITUACAO VALUES ('MP9', 'Mensagem recebida com sucesso');
 INSERT INTO SITUACAO VALUES ('AR9', 'Arquivo recebido com sucesso');
 INSERT INTO SITUACAO VALUES ('AP9', 'Arquivo processado com sucesso');
 INSERT INTO SITUACAO VALUES ('BP8', 'Boleto recebido com sucesso. Aguardando pagamento');
+INSERT INTO SITUACAO VALUES ('BP9', 'Boleto pago com sucesso.');
+INSERT INTO SITUACAO VALUES ('BE9', 'Boleto enviado com sucesso.');
+INSERT INTO SITUACAO VALUES ('ME9', 'Mensagem enviada com sucesso.');
+INSERT INTO SITUACAO VALUES ('AE9', 'Arquivo enviado com sucesso.');
 
 /*
 

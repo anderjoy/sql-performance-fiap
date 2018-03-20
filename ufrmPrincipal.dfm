@@ -35,7 +35,7 @@ object Form1: TForm1
     EditLabel.Height = 13
     EditLabel.Caption = 'Servidor'
     TabOrder = 1
-    Text = 'ajesus.ddns.net,3312'
+    Text = 'srvdatabase'
   end
   object edtUsername: TLabeledEdit
     Left = 12
@@ -95,6 +95,33 @@ object Form1: TForm1
     Caption = 'Boletos'
     TabOrder = 6
     OnClick = btnProcBoletoClick
+  end
+  object btnPagar: TButton
+    Left = 169
+    Top = 126
+    Width = 75
+    Height = 25
+    Caption = 'Pagar Boletos'
+    TabOrder = 7
+    OnClick = btnPagarClick
+  end
+  object btnEnvBoleto: TButton
+    Left = 250
+    Top = 126
+    Width = 103
+    Height = 25
+    Caption = 'Enviar Boletos Msg'
+    TabOrder = 8
+    OnClick = btnEnvBoletoClick
+  end
+  object btnEnvBltArqv: TButton
+    Left = 357
+    Top = 126
+    Width = 103
+    Height = 25
+    Caption = 'Enviar Boletos Arqv'
+    TabOrder = 9
+    OnClick = btnEnvBltArqvClick
   end
   object FDConnection1: TFDConnection
     Params.Strings = (

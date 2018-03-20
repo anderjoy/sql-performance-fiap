@@ -23,8 +23,14 @@ type
     FDPhysMSSQLDriverLink1: TFDPhysMSSQLDriverLink;
     Memo1: TMemo;
     btnProcBoleto: TButton;
+    btnPagar: TButton;
+    btnEnvBoleto: TButton;
+    btnEnvBltArqv: TButton;
     procedure btnCarregarClick(Sender: TObject);
     procedure btnProcBoletoClick(Sender: TObject);
+    procedure btnPagarClick(Sender: TObject);
+    procedure btnEnvBoletoClick(Sender: TObject);
+    procedure btnEnvBltArqvClick(Sender: TObject);
   private
     xTime: TStopWatch;
 
@@ -34,6 +40,9 @@ type
     procedure ReceberMensagens();
     procedure ReceberArquivos();
     procedure ProcessaBoletosRec();
+    procedure PagarBoletos();
+    procedure EnviarBoletosMsg();
+    procedure EnviarBoletosArqv();
 
     function GetCPFCNPJ(TPPessoa: string; SeqTit: Int64): Int64;
 
@@ -57,6 +66,8 @@ implementation
 
 uses
   FireDAC.Stan.Param, System.StrUtils, System.DateUtils;
+
+  //ajesus.ddns.net,3312
 
 {$R *.dfm}
 
@@ -104,7 +115,6 @@ begin
   Result := True;
 end;
 
-
 procedure TForm1.AddLogInicio(Msg: String);
 begin
   Msg := GetTimeFormated() + ' -> Inicio : ' + Msg;
@@ -114,6 +124,8 @@ begin
   xTime := TStopwatch.StartNew;
 
   GravarMonitor('INICIO', Msg);
+
+  Application.ProcessMessages();
 end;
 
 procedure TForm1.AddMsgLog(Msg: String);
@@ -123,6 +135,8 @@ begin
   Memo1.Lines.Add(Msg);
 
   GravarMonitor('LOG', Msg);
+
+  Application.ProcessMessages();
 end;
 
 procedure TForm1.AddLogFim(Msg: String);
@@ -144,6 +158,8 @@ begin
   GravarMonitor('FIM', Msg);
 
   Memo1.Lines.Add(StringOfChar('-', 30));
+
+  Application.ProcessMessages();
 end;
 
 function TForm1.GetCPFCNPJ(TPPessoa: string; SeqTit: Int64): Int64;
@@ -251,8 +267,6 @@ procedure TForm1.btnCarregarClick(Sender: TObject);
 begin
   if Conectar() then begin
 
-    memo1.Clear;
-
     try
 
       FDConnection1.StartTransaction;
@@ -288,6 +302,87 @@ begin
       FDConnection1.StartTransaction;
 
       ProcessaBoletosRec();
+
+      FDConnection1.Commit;
+
+    except
+      on E: Exception do begin
+
+        if FDConnection1.InTransaction then begin
+
+          AddMsgLog('Error: ' + E.Message);
+
+          FDConnection1.Rollback;
+        end;
+      end;
+
+    end;
+  end;
+end;
+
+procedure TForm1.btnPagarClick(Sender: TObject);
+begin
+  if Conectar() then begin
+
+    try
+
+      FDConnection1.StartTransaction;
+
+      PagarBoletos();
+
+      FDConnection1.Commit;
+
+    except
+      on E: Exception do begin
+
+        if FDConnection1.InTransaction then begin
+
+          AddMsgLog('Error: ' + E.Message);
+
+          FDConnection1.Rollback;
+        end;
+      end;
+
+    end;
+  end;
+end;
+
+procedure TForm1.btnEnvBoletoClick(Sender: TObject);
+begin
+  if Conectar() then begin
+
+    try
+
+      FDConnection1.StartTransaction;
+
+      EnviarBoletosMsg();
+
+      FDConnection1.Commit;
+
+    except
+      on E: Exception do begin
+
+        if FDConnection1.InTransaction then begin
+
+          AddMsgLog('Error: ' + E.Message);
+
+          FDConnection1.Rollback;
+        end;
+      end;
+
+    end;
+  end;
+end;
+
+procedure TForm1.btnEnvBltArqvClick(Sender: TObject);
+begin
+  if Conectar() then begin
+
+    try
+
+      FDConnection1.StartTransaction;
+
+      EnviarBoletosArqv();
 
       FDConnection1.Commit;
 
@@ -387,29 +482,43 @@ const
   CPFCNPJ     : Integer = 1;
   DHIntegracao: Integer = 2;
   Situacao    : Integer = 3;
+  TPCliente2  : Integer = 4;
+  CPFCNPJ2    : Integer = 5;
+
 
 var
   qryClientes: TFDQuery;
-  i: Integer;
+  i, iCliente: Integer;
 
   TPPessoa: string;
 begin
-
   qryClientes := TFDQuery.Create(nil);
   try
 
     qryClientes.Connection := FDConnection1;
+
+    qryClientes.Open(
+      'SELECT COUNT(1) AS QTD FROM CLIENTE'
+    );
+
+    iCliente := qryClientes.Fields[0].AsInteger + 1;
+
+    qryClientes.Close;
     qryClientes.SQL.Text   :=
       'INSERT INTO Cliente ' +
       ' (TPCliente, ' +
       '  CPFCNPJ, ' +
       '  DHIntegracao, ' +
       '  Situacao) ' +
-      'VALUES ' +
-      ' (' + ':TPCliente' + ', ' +
+      'SELECT ' +
+      '  ' + ':TPCliente' + ', ' +
       '  ' + ':CPFCNPJ' + ', ' +
       '  ' + ':DHIntegracao' + ', ' +
-      '  ' + ':Situacao' + ')';
+      '  ' + ':Situacao' + ' ' +
+      'WHERE NOT EXISTS (SELECT 1 ' +
+      '                  FROM Cliente CLI ' +
+      '                  WHERE CLI.TPCliente = :TPCliente2 ' +
+      '                    AND CLI.CPFCNPJ   = :CPFCNPJ2)';
 
     qryClientes.Params.BindMode               := pbByNumber;
     qryClientes.Params[TPCliente].DataType    := ftString;
@@ -418,24 +527,30 @@ begin
     qryClientes.Params[DHIntegracao].DataType := ftLargeint;
     qryClientes.Params[Situacao].DataType     := ftString;
     qryClientes.Params[Situacao].Size         := 3;
+    qryClientes.Params[TPCliente2].DataType   := ftString;
+    qryClientes.Params[TPCliente2].Size       := 1;
+    qryClientes.Params[CPFCNPJ2].DataType     := ftLargeint;
     qryClientes.Prepare;
 
     qryClientes.Params.ArraySize := TOTAL_CLIENTE;
 
     AddLogInicio('Adicionando clientes');
-    for I := 1 to TOTAL_CLIENTE  do begin
+    for I := 1 to qryClientes.Params.ArraySize  do begin
 
-      if (I mod 2) = 0 then begin
+      if (iCliente mod 2) = 0 then begin
         TPPessoa := 'F';
       end else begin
         TPPessoa := 'J';
       end;
 
       qryClientes.Params[TPCliente].AsStrings[i - 1]      := TPPessoa;
-      qryClientes.Params[CPFCNPJ].AsLargeInts[i - 1]      := GetCPFCNPJ(TPPessoa, i);
+      qryClientes.Params[CPFCNPJ].AsLargeInts[i - 1]      := GetCPFCNPJ(TPPessoa, iCliente);
       qryClientes.Params[DHIntegracao].AsLargeInts[i - 1] := StrToInt64(FormatDateTime('yyyymmddhhnnss', Now()));
       qryClientes.Params[Situacao].AsStrings[i - 1]       := 'CI9';
+      qryClientes.Params[TPCliente2].AsStrings[i - 1]     := qryClientes.Params[TPCliente].AsStrings[i - 1];
+      qryClientes.Params[CPFCNPJ2].AsLargeInts[i - 1]     := qryClientes.Params[CPFCNPJ].AsLargeInts[i - 1];
 
+      Inc(iCliente);
     end;
 
     qryClientes.ResourceOptions.ArrayDMLSize := MAX_ARRAYSIZE;
@@ -688,6 +803,7 @@ var
   TPPessoa: string;
   iCPFCNPJ: Int64;
 begin
+  Randomize;
 
   qryBoleto           := TFDQuery.Create(nil);
   qryArquivos         := TFDQuery.Create(nil);
@@ -832,9 +948,9 @@ begin
       '  AND SITUACAO         = ''MR9'''
     );
 
-    iItem := 1;
-
     while not qryMensagens.Eof do begin
+
+      iItem := qryMensagens.FieldByName('IDMensagem').AsInteger;
 
       if (iItem mod 2) = 0 then begin
         TPPessoa := 'F';
@@ -858,12 +974,12 @@ begin
         qryBoleto.Params.ArraySize := qryBoleto.Params.ArraySize + 1;
         iDML                       :=  qryBoleto.Params.ArraySize - 1;
 
-        qryBoleto.Params[NrBoleto].AsIntegers[iDML]      := iItem;
+        qryBoleto.Params[NrBoleto].AsIntegers[iDML]      := GetProximaSequencia('Boleto');
         qryBoleto.Params[TPCliente].AsStrings[iDML]      := TPPessoa;
         qryBoleto.Params[CPFCNPJ].AsLargeInts[iDML]      := iCPFCNPJ;
         qryBoleto.Params[IDMensagemRec].AsIntegers[iDML] := qryMensagens.FieldByName('IDMensagem').AsInteger;
-        qryBoleto.Params[LinhaDigitavel].AsStrings[iDML] := Zeros(iItem * 8, 35);
-        qryBoleto.Params[CodBarras].AsStrings[iDML]      := Zeros(iItem * 9, 41);
+        qryBoleto.Params[LinhaDigitavel].AsStrings[iDML] := Zeros(iItem, 35);
+        qryBoleto.Params[CodBarras].AsStrings[iDML]      := Zeros(iItem, 41);
         qryBoleto.Params[Valor].AsBCDs[iDML]             := iDML * 2.98;
         qryBoleto.Params[CDProduto].AsStrings[iDML]      := 'ACP';
         qryBoleto.Params[NMProduto].AsStrings[iDML]      := 'Alguma coisa';
@@ -895,8 +1011,11 @@ begin
       qryMensagens.Next;
     end;
 
-    qryBoleto.ResourceOptions.ArrayDMLSize := MAX_ARRAYSIZE;
-    qryBoleto.Execute(qryBoleto.Params.ArraySize);
+    if qryBoleto.Params.ArraySize > 0 then begin
+
+      qryBoleto.ResourceOptions.ArrayDMLSize := MAX_ARRAYSIZE;
+      qryBoleto.Execute(qryBoleto.Params.ArraySize);
+    end;
 
     AddLogFim(qryBoleto.Params.ArraySize.ToString());
 
@@ -916,6 +1035,8 @@ begin
 
     while not qryMensagens.Eof do begin
 
+      iItem := qryMensagens.FieldByName('IDArquivo').AsInteger;
+
       if (iItem mod 2) = 0 then begin
         TPPessoa := 'F';
       end else begin
@@ -931,19 +1052,15 @@ begin
 
       if not qryExisteCliente.IsEmpty then begin
 
-        qryMensagemItem.Close;
-        qryMensagemItem.Params[0].AsInteger := qryMensagens.FieldByName('IDMensagem').AsInteger;
-        qryMensagemItem.Open();
-
         qryBoleto.Params.ArraySize := qryBoleto.Params.ArraySize + 1;
-        iDML                       :=  qryBoleto.Params.ArraySize - 1;
+        iDML                       := qryBoleto.Params.ArraySize - 1;
 
-        qryBoleto.Params[NrBoleto].AsIntegers[iDML]      := iItem;
+        qryBoleto.Params[NrBoleto].AsIntegers[iDML]      := GetProximaSequencia('Boleto');
         qryBoleto.Params[TPCliente].AsStrings[iDML]      := TPPessoa;
         qryBoleto.Params[CPFCNPJ].AsLargeInts[iDML]      := iCPFCNPJ;
         qryBoleto.Params[IDArquivoRec].AsIntegers[iDML]  := qryMensagens.FieldByName('IDArquivo').AsInteger;
-        qryBoleto.Params[LinhaDigitavel].AsStrings[iDML] := Zeros(iItem * 11, 35);
-        qryBoleto.Params[CodBarras].AsStrings[iDML]      := Zeros(iItem * 12, 41);
+        qryBoleto.Params[LinhaDigitavel].AsStrings[iDML] := Zeros(iItem, 35);
+        qryBoleto.Params[CodBarras].AsStrings[iDML]      := Zeros(iItem, 41);
         qryBoleto.Params[Valor].AsBCDs[iDML]             := 0.98;
         qryBoleto.Params[CDProduto].AsStrings[iDML]      := 'MCP';
         qryBoleto.Params[NMProduto].AsStrings[iDML]      := 'Alguma coisa';
@@ -975,8 +1092,11 @@ begin
       qryMensagens.Next;
     end;
 
-    qryBoleto.ResourceOptions.ArrayDMLSize := MAX_ARRAYSIZE;
-    qryBoleto.Execute(qryBoleto.Params.ArraySize);
+    if qryBoleto.Params.ArraySize > 0 then begin
+
+      qryBoleto.ResourceOptions.ArrayDMLSize := MAX_ARRAYSIZE;
+      qryBoleto.Execute(qryBoleto.Params.ArraySize);
+    end;
 
     AddLogFim(qryBoleto.Params.ArraySize.ToString());
   finally
@@ -987,6 +1107,349 @@ begin
     FreeAndNil(qryExisteCliente);
     FreeAndNil(qryAtualizaMensagem);
     FreeAndNil(qryAtualizaArquivo);
+  end;
+end;
+
+procedure TForm1.PagarBoletos;
+var
+  qryPagarBoletos: TFDQuery;
+begin
+  qryPagarBoletos := TFDQuery.Create(nil);
+  try
+    qryPagarBoletos.Connection := FDConnection1;
+
+    AddLogInicio('Pagando todos os boletos');
+
+    qryPagarBoletos.ExecSQL(
+      'UPDATE BOLETO SET ValorPago        = VALOR, ' +
+      '                  DHPagamento      = ' + GetNowAsString() + ', ' +
+      '                  Situacao         = ''BP9'', ' +
+      '                  CDBancoRecebedor = ''ITAU'' ' +
+      'WHERE Situacao  = ''BP8'' ' +
+      '  AND Cancelado = ''N'''
+    );
+
+    AddLogFim(qryPagarBoletos.RowsAffected.ToString());
+  finally
+    FreeAndNil(qryPagarBoletos);
+  end;
+end;
+
+procedure TForm1.EnviarBoletosMsg;
+const
+  MSG_IDMensagem      : Integer = 0;
+  MSG_DHMensagem      : Integer = 1;
+  MSG_CDMensagem      : Integer = 2;
+  MSG_EnvioRecebimento: Integer = 3;
+  MSG_Situacao        : Integer = 4;
+
+const
+  ITEM_IDMensagemItem: Integer = 0;
+  ITEM_IDMensagem    : Integer = 1;
+  ITEM_CDTag         : Integer = 2;
+  ITEM_Profundidade  : Integer = 3;
+  ITEM_ValorTag      : Integer = 4;
+
+const
+  BLT_NrBoleto     : Integer = 2;
+  BLT_TPCliente    : Integer = 3;
+  BLT_CPFCNPJ      : Integer = 4;
+  BLT_IDMensagemEnv: Integer = 1;
+  BLT_Situacao     : Integer = 0;
+
+var
+  qryEnviarBoletos: TFDQuery;
+  qryMensagem, qryMensagemItem, qryAtualizaBoleto: TFDQuery;
+  iDML, iDMLItem, iDMLAtu, iIDMensagemEnv, iItem: Integer;
+begin
+  qryEnviarBoletos  := TFDQuery.Create(nil);
+  qryMensagem       := TFDQuery.Create(nil);
+  qryMensagemItem   := TFDQuery.Create(nil);
+  qryAtualizaBoleto := TFDQuery.Create(nil);
+  try
+    qryEnviarBoletos.Connection   := FDConnection1;
+    qryMensagem.Connection        := FDConnection1;
+    qryMensagemItem.Connection    := FDConnection1;
+    qryAtualizaBoleto.Connection  := FDConnection1;
+
+    AddLogInicio('Enviando boletos via mensagem');
+
+    qryMensagem.SQL.Text   :=
+      'INSERT INTO Mensagem ' +
+      ' (IDMensagem, ' +
+      '  DHMensagem, ' +
+      '  CDMensagem, ' +
+      '  EnvioRecebimento, ' +
+      '  Situacao) ' +
+      'VALUES ' +
+      ' (' + ':IDMensagem' + ', ' +
+      '  ' + ':DHMensagem' + ', ' +
+      '  ' + ':CDMensagem' + ', ' +
+      '  ' + ':EnvioRecebimento' + ', ' +
+      '  ' + ':Situacao' + ')';
+
+    qryMensagem.Params.BindMode                       := pbByNumber;
+    qryMensagem.Params[MSG_IDMensagem].DataType       := ftInteger;
+    qryMensagem.Params[MSG_DHMensagem].DataType       := ftLargeint;
+    qryMensagem.Params[MSG_CDMensagem].DataType       := ftString;
+    qryMensagem.Params[MSG_CDMensagem].Size           := 20;
+    qryMensagem.Params[MSG_EnvioRecebimento].DataType := ftString;
+    qryMensagem.Params[MSG_EnvioRecebimento].Size     := 1;
+    qryMensagem.Params[MSG_Situacao].DataType         := ftString;
+    qryMensagem.Params[MSG_Situacao].Size             := 3;
+    qryMensagem.Prepare;
+
+    qryMensagemItem.SQL.Text :=
+      'INSERT INTO MensagemItem ' +
+      '  (IDMensagemItem, ' +
+      '  IDMensagem, ' +
+      '  CDTag, ' +
+      '  Profundidade, ' +
+      '  ValorTag) ' +
+      'VALUES ' +
+      ' (' + ':IDMensagemItem' + ', ' +
+      '  ' + ':IDMensagem' + ', ' +
+      '  ' + ':CDTag' + ', ' +
+      '  ' + ':Profundidade' + ', ' +
+      '  ' + ':ValorTag' + ')';
+
+    qryMensagemItem.Params.BindMode                      := pbByNumber;
+    qryMensagemItem.Params[ITEM_IDMensagemItem].DataType := ftInteger;
+    qryMensagemItem.Params[ITEM_IDMensagem].DataType     := ftInteger;
+    qryMensagemItem.Params[ITEM_CDTag].DataType          := ftString;
+    qryMensagemItem.Params[ITEM_CDTag].Size              := 50;
+    qryMensagemItem.Params[ITEM_Profundidade].DataType   := ftInteger;
+    qryMensagemItem.Params[ITEM_ValorTag].DataType       := ftString;
+    qryMensagemItem.Params[ITEM_ValorTag].Size           := 4000;
+    qryMensagemItem.Prepare;
+
+    qryAtualizaBoleto.SQL.Text :=
+      'UPDATE BOLETO SET SITUACAO      = :SITUACAO, ' +
+      '                  IDMensagemEnv = :IDMensagemEnv ' +
+      'WHERE NRBOLETO  = :NRBOLETO ' +
+      '  AND TPCLIENTE = :TPCLIENTE ' +
+      '  AND CPFCNPJ   = :CPFCNPJ';
+
+    qryAtualizaBoleto.Params.BindMode                    := pbByNumber;
+    qryAtualizaBoleto.Params[BLT_NrBoleto].DataType      := ftInteger;
+    qryAtualizaBoleto.Params[BLT_TPCliente].DataType     := ftString;
+    qryAtualizaBoleto.Params[BLT_TPCliente].Size         := 1;
+    qryAtualizaBoleto.Params[BLT_CPFCNPJ].DataType       := ftLargeint;
+    qryAtualizaBoleto.Params[BLT_IDMensagemEnv].DataType := ftInteger;
+    qryAtualizaBoleto.Params[BLT_Situacao].DataType      := ftString;
+    qryAtualizaBoleto.Params[BLT_Situacao].Size          := 3;
+    qryAtualizaBoleto.Prepare;
+
+    qryMensagem.Params.ArraySize       := 0;
+    qryMensagemItem.Params.ArraySize   := 0;
+    qryAtualizaBoleto.Params.ArraySize := 0;
+
+    //-------------------------------------------------------------------------\\
+
+    qryEnviarBoletos.Open(
+      'SELECT * ' +
+      'FROM BOLETO ' +
+      'WHERE IDMensagemRec IS NOT NULL ' +
+      '  AND Situacao  = ''BP9'' ' +
+      '  AND Cancelado = ''N'''
+    );
+
+    while not qryEnviarBoletos.Eof do begin
+
+      iIDMensagemEnv := GetProximaSequencia('MENSAGEM');
+
+      qryMensagem.Params.ArraySize := qryMensagem.Params.ArraySize + 1;
+      iDML                         :=  qryMensagem.Params.ArraySize - 1;
+
+      qryMensagem.Params[MSG_IDMensagem].AsIntegers[iDML]      := iIDMensagemEnv;
+      qryMensagem.Params[MSG_DHMensagem].AsLargeInts[iDML]     := StrToInt64(FormatDateTime('yyyymmddhhnnss', Now()));
+      qryMensagem.Params[MSG_CDMensagem].AsStrings[iDML]       := 'ENV' + IntToStr(iDML);
+      qryMensagem.Params[MSG_EnvioRecebimento].AsStrings[iDML] := 'E';
+      qryMensagem.Params[MSG_Situacao].AsStrings[iDML]         := 'ME9';
+
+      for iItem := 0 to TOTAL_MSGITEMPORMSG - 1 do begin
+
+        qryMensagemItem.Params.ArraySize := qryMensagemItem.Params.ArraySize + 1;
+        iDMLItem                         :=  qryMensagemItem.Params.ArraySize - 1;
+
+        qryMensagemItem.Params[ITEM_IDMensagemItem].AsIntegers[iDMLItem] := GetProximaSequencia('MSGITEM');
+        qryMensagemItem.Params[ITEM_IDMensagem].AsIntegers[iDMLItem]     := iIDMensagemEnv;
+        qryMensagemItem.Params[ITEM_CDTag].AsStrings[iDMLItem]           := 'Tag' + IntToStr(iItem);
+        qryMensagemItem.Params[ITEM_Profundidade].AsIntegers[iDMLItem]   := 1;
+        qryMensagemItem.Params[ITEM_ValorTag].AsStrings[iDMLItem]        := '<Tag' + IntToStr(iItem) + '> Algum conteudo qualquer ' + IntToStr(iItem) + '</Tag' + IntToStr(iItem) + '>';
+      end;
+
+      qryAtualizaBoleto.Params.ArraySize := qryAtualizaBoleto.Params.ArraySize + 1;
+      iDMLAtu                            :=  qryAtualizaBoleto.Params.ArraySize - 1;
+
+      qryAtualizaBoleto.Params[BLT_NrBoleto].AsIntegers[iDMLAtu]      := qryEnviarBoletos.FieldByName('NrBoleto').AsInteger;
+      qryAtualizaBoleto.Params[BLT_TPCliente].AsStrings[iDMLAtu]      := qryEnviarBoletos.FieldByName('TPCliente').AsString;
+      qryAtualizaBoleto.Params[BLT_CPFCNPJ].AsLargeInts[iDMLAtu]      := qryEnviarBoletos.FieldByName('CPFCNPJ').AsLargeInt;
+      qryAtualizaBoleto.Params[BLT_IDMensagemEnv].AsIntegers[iDMLAtu] := iIDMensagemEnv;
+      qryAtualizaBoleto.Params[BLT_Situacao].AsStrings[iDMLAtu]       := 'BE9';
+
+      qryEnviarBoletos.Next;
+    end;
+
+    qryMensagem.ResourceOptions.ArrayDMLSize       := MAX_ARRAYSIZE;
+    qryMensagemItem.ResourceOptions.ArrayDMLSize   := MAX_ARRAYSIZE;
+    qryAtualizaBoleto.ResourceOptions.ArrayDMLSize := MAX_ARRAYSIZE;
+
+    if qryMensagem.Params.ArraySize > 0 then begin
+
+      qryMensagem.Execute(qryMensagem.Params.ArraySize);
+      qryMensagemItem.Execute(qryMensagemItem.Params.ArraySize);
+      qryAtualizaBoleto.Execute(qryAtualizaBoleto.Params.ArraySize);
+    end;
+
+    AddLogFim(qryEnviarBoletos.RowsAffected.ToString());
+  finally
+    FreeAndNil(qryEnviarBoletos);
+    FreeAndNil(qryMensagem);
+    FreeAndNil(qryMensagemItem);
+    FreeAndNil(qryAtualizaBoleto);
+  end;
+end;
+
+procedure TForm1.EnviarBoletosArqv;
+const
+  IDArquivo       : Integer = 0;
+  Path            : Integer = 1;
+  FileName        : Integer = 2;
+  ConteudoXML     : Integer = 3;
+  DHRecebimento   : Integer = 4;
+  TPArquivo       : Integer = 5;
+  EnvioRecebimento: Integer = 6;
+  Situacao        : Integer = 7;
+
+const
+  BLT_NrBoleto     : Integer = 2;
+  BLT_TPCliente    : Integer = 3;
+  BLT_CPFCNPJ      : Integer = 4;
+  BLT_IDArquivoEnv : Integer = 1;
+  BLT_Situacao     : Integer = 0;
+
+var
+  qryEnviarBoletos: TFDQuery;
+  qryArquivo, qryAtualizaBoleto: TFDQuery;
+  iDML, iDMLAtu: Integer;
+begin
+  qryEnviarBoletos  := TFDQuery.Create(nil);
+  qryAtualizaBoleto := TFDQuery.Create(nil);
+  qryArquivo        := TFDQuery.Create(nil);
+  try
+    qryEnviarBoletos.Connection  := FDConnection1;
+    qryArquivo.Connection        := FDConnection1;
+    qryAtualizaBoleto.Connection := FDConnection1;
+
+    AddLogInicio('Enviando boletos via arquivo');
+
+    qryArquivo.SQL.Text   :=
+      'INSERT INTO Arquivo ' +
+      ' (IDArquivo, ' +
+      '  Path, ' +
+      '  FileName, ' +
+      '  ConteudoXML, ' +
+      '  DHRecebimento, ' +
+      '  TPArquivo, ' +
+      '  EnvioRecebimento, ' +
+      '  Situacao) ' +
+      'VALUES ' +
+      ' (' + ':IDArquivo' + ', ' +
+      '  ' + ':Path' + ', ' +
+      '  ' + ':FileName' + ', ' +
+      '  ' + ':ConteudoXML' + ', ' +
+      '  ' + ':DHRecebimento' + ', ' +
+      '  ' + ':TPArquivo' + ', ' +
+      '  ' + ':EnvioRecebimento' + ', ' +
+      '  ' + ':Situacao' + ')';
+
+    qryArquivo.Params.BindMode                   := pbByNumber;
+    qryArquivo.Params[IDArquivo].DataType        := ftInteger;
+    qryArquivo.Params[Path].DataType             := ftString;
+    qryArquivo.Params[Path].Size                 := 255;
+    qryArquivo.Params[FileName].DataType         := ftString;
+    qryArquivo.Params[FileName].Size             := 255;
+    qryArquivo.Params[ConteudoXML].DataType      := ftMemo;
+    qryArquivo.Params[DHRecebimento].DataType    := ftLargeint;
+    qryArquivo.Params[TPArquivo].DataType        := ftString;
+    qryArquivo.Params[TPArquivo].Size            := 10;
+    qryArquivo.Params[EnvioRecebimento].DataType := ftString;
+    qryArquivo.Params[EnvioRecebimento].Size     := 1;
+    qryArquivo.Params[Situacao].DataType         := ftString;
+    qryArquivo.Params[Situacao].Size             := 3;
+    qryArquivo.Prepare;
+
+    qryAtualizaBoleto.SQL.Text :=
+      'UPDATE BOLETO SET SITUACAO     = :SITUACAO, ' +
+      '                  IDArquivoEnv = :IDArquivoEnv ' +
+      'WHERE NRBOLETO  = :NRBOLETO ' +
+      '  AND TPCLIENTE = :TPCLIENTE ' +
+      '  AND CPFCNPJ   = :CPFCNPJ';
+
+    qryAtualizaBoleto.Params.BindMode                    := pbByNumber;
+    qryAtualizaBoleto.Params[BLT_NrBoleto].DataType      := ftInteger;
+    qryAtualizaBoleto.Params[BLT_TPCliente].DataType     := ftString;
+    qryAtualizaBoleto.Params[BLT_TPCliente].Size         := 1;
+    qryAtualizaBoleto.Params[BLT_CPFCNPJ].DataType       := ftLargeint;
+    qryAtualizaBoleto.Params[BLT_IDArquivoEnv].DataType  := ftInteger;
+    qryAtualizaBoleto.Params[BLT_Situacao].DataType      := ftString;
+    qryAtualizaBoleto.Params[BLT_Situacao].Size          := 3;
+    qryAtualizaBoleto.Prepare;
+
+    qryArquivo.Params.ArraySize        := 0;
+    qryAtualizaBoleto.Params.ArraySize := 0;
+
+    //-------------------------------------------------------------------------\\
+
+    qryEnviarBoletos.Open(
+      'SELECT * ' +
+      'FROM BOLETO ' +
+      'WHERE IDArquivoRec IS NOT NULL ' +
+      '  AND Situacao  = ''BP9'' ' +
+      '  AND Cancelado = ''N'''
+    );
+
+    while not qryEnviarBoletos.Eof do begin
+
+      qryArquivo.Params.ArraySize := qryArquivo.Params.ArraySize + 1;
+      iDML                        :=  qryArquivo.Params.ArraySize - 1;
+
+      qryArquivo.Params[IDArquivo].AsIntegers[iDML]       := GetProximaSequencia('ARQUIVO');
+      qryArquivo.Params[Path].AsStrings[iDML]             := 'C:\ARQV_ENV\Connect';
+      qryArquivo.Params[FileName].AsStrings[iDML]         := 'ARQ_ENV_' + IntToStr(iDML) + '.xml';
+      qryArquivo.Params[ConteudoXML].AsMemos[iDML]        := '<Tag' + IntToStr(iDML) + '> Algum conteudo qualquer ' + IntToStr(iDML) + '</Tag' + IntToStr(iDML) + '>';
+      qryArquivo.Params[DHRecebimento].AsLargeInts[iDML]  := StrToInt64(FormatDateTime('yyyymmddhhnnss', Now()));
+      qryArquivo.Params[TPArquivo].AsStrings[iDML]        := 'AENV' + IntToStr(iDML);
+      qryArquivo.Params[EnvioRecebimento].AsStrings[iDML] := 'E';
+      qryArquivo.Params[Situacao].AsStrings[iDML]         := 'AE9';
+
+      qryAtualizaBoleto.Params.ArraySize := qryAtualizaBoleto.Params.ArraySize + 1;
+      iDMLAtu                            :=  qryAtualizaBoleto.Params.ArraySize - 1;
+
+      qryAtualizaBoleto.Params[BLT_NrBoleto].AsIntegers[iDMLAtu]     := qryEnviarBoletos.FieldByName('NrBoleto').AsInteger;
+      qryAtualizaBoleto.Params[BLT_TPCliente].AsStrings[iDMLAtu]     := qryEnviarBoletos.FieldByName('TPCliente').AsString;
+      qryAtualizaBoleto.Params[BLT_CPFCNPJ].AsLargeInts[iDMLAtu]     := qryEnviarBoletos.FieldByName('CPFCNPJ').AsLargeInt;
+      qryAtualizaBoleto.Params[BLT_IDArquivoEnv].AsIntegers[iDMLAtu] := qryArquivo.Params[IDArquivo].AsIntegers[iDML];
+      qryAtualizaBoleto.Params[BLT_Situacao].AsStrings[iDMLAtu]      := 'BE9';
+
+      qryEnviarBoletos.Next;
+    end;
+
+    qryArquivo.ResourceOptions.ArrayDMLSize        := MAX_ARRAYSIZE;
+    qryAtualizaBoleto.ResourceOptions.ArrayDMLSize := MAX_ARRAYSIZE;
+
+    if qryArquivo.Params.ArraySize > 0 then begin
+
+      qryArquivo.Execute(qryArquivo.Params.ArraySize);
+      qryAtualizaBoleto.Execute(qryAtualizaBoleto.Params.ArraySize);
+    end;
+
+    AddLogFim((qryArquivo.Params.ArraySize + qryAtualizaBoleto.Params.ArraySize).ToString());
+  finally
+    FreeAndNil(qryEnviarBoletos);
+    FreeAndNil(qryArquivo);
+    FreeAndNil(qryAtualizaBoleto);
   end;
 end;
 
