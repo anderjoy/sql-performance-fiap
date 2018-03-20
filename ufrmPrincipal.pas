@@ -629,7 +629,7 @@ const
 
 var
   qryBoleto: TFDQuery;
-  qryArquivos, qryMensagens, qryExisteCliente, qryAtualizaMensagem, qryAtualizaArquivo: TFDQuery;
+  qryArquivos, qryMensagens, qryMensagemItem, qryExisteCliente, qryAtualizaMensagem, qryAtualizaArquivo: TFDQuery;
   iDML: Integer;
 
   i, iItem: Integer;
@@ -641,6 +641,7 @@ begin
   qryBoleto           := TFDQuery.Create(nil);
   qryArquivos         := TFDQuery.Create(nil);
   qryMensagens        := TFDQuery.Create(nil);
+  qryMensagemItem     := TFDQuery.Create(nil);
   qryExisteCliente    := TFDQuery.Create(nil);
   qryAtualizaMensagem := TFDQuery.Create(nil);
   qryAtualizaArquivo  := TFDQuery.Create(nil);
@@ -648,6 +649,7 @@ begin
     qryBoleto.Connection           := FDConnection1;
     qryArquivos.Connection         := FDConnection1;
     qryMensagens.Connection        := FDConnection1;
+    qryMensagemItem.Connection     := FDConnection1;
     qryExisteCliente.Connection    := FDConnection1;
     qryAtualizaMensagem.Connection := FDConnection1;
     qryAtualizaArquivo.Connection  := FDConnection1;
@@ -672,6 +674,14 @@ begin
     qryAtualizaMensagem.Params[ATLM_Situacao].DataType   := ftString;
     qryAtualizaMensagem.Params[ATLM_Situacao].Size       := 3;
     qryAtualizaMensagem.Prepare;
+
+    qryMensagemItem.SQL.Text :=
+      'SELECT IDMensagemItem, IDMensagem, IDMensagemPai, CDTag, Profundidade, ValorTag ' +
+      'FROM MensagemItem ' +
+      'WHERE IDMensagem = :IDMensagem';
+    qryMensagemItem.Params.BindMode    := pbByNumber;
+    qryMensagemItem.Params[0].DataType := ftInteger;
+    qryMensagemItem.Prepare;
 
     qryAtualizaArquivo.SQL.Text :=
       'UPDATE Arquivo ' +
@@ -790,6 +800,10 @@ begin
 
       if not qryExisteCliente.IsEmpty then begin
 
+        qryMensagemItem.Close;
+        qryMensagemItem.Params[0].AsInteger := qryMensagens.FieldByName('IDMensagem').AsInteger;
+        qryMensagemItem.Open();
+
         qryBoleto.Params.ArraySize := qryBoleto.Params.ArraySize + 1;
         iDML                       :=  qryBoleto.Params.ArraySize - 1;
 
@@ -867,6 +881,10 @@ begin
 
       if not qryExisteCliente.IsEmpty then begin
 
+        qryMensagemItem.Close;
+        qryMensagemItem.Params[0].AsInteger := qryMensagens.FieldByName('IDMensagem').AsInteger;
+        qryMensagemItem.Open();
+
         qryBoleto.Params.ArraySize := qryBoleto.Params.ArraySize + 1;
         iDML                       :=  qryBoleto.Params.ArraySize - 1;
 
@@ -915,6 +933,7 @@ begin
     FreeAndNil(qryBoleto);
     FreeAndNil(qryArquivos);
     FreeAndNil(qryMensagens);
+    FreeAndNil(qryMensagemItem);
     FreeAndNil(qryExisteCliente);
     FreeAndNil(qryAtualizaMensagem);
     FreeAndNil(qryAtualizaArquivo);
