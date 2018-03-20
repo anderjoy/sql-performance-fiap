@@ -13,7 +13,7 @@ uses
 
 type
   TForm1 = class(TForm)
-    Button1: TButton;
+    btnCarregar: TButton;
     edtServer: TLabeledEdit;
     edtUsername: TLabeledEdit;
     edtPassword: TLabeledEdit;
@@ -22,7 +22,9 @@ type
     FDGUIxWaitCursor1: TFDGUIxWaitCursor;
     FDPhysMSSQLDriverLink1: TFDPhysMSSQLDriverLink;
     Memo1: TMemo;
-    procedure Button1Click(Sender: TObject);
+    btnProcBoleto: TButton;
+    procedure btnCarregarClick(Sender: TObject);
+    procedure btnProcBoletoClick(Sender: TObject);
   private
     xTime: TStopWatch;
 
@@ -54,7 +56,7 @@ var
 implementation
 
 uses
-  FireDAC.Stan.Param, JDFuncoes, System.DateUtils;
+  FireDAC.Stan.Param, System.StrUtils, System.DateUtils;
 
 {$R *.dfm}
 
@@ -64,6 +66,29 @@ const
   TOTAL_CLIENTE      : Integer = 10000;
   TOTAL_MENSAGEM     : Integer = 10000;
   TOTAL_MSGITEMPORMSG: Integer = 7;
+
+
+function Zeros(Valor: string; Tamanho: integer; Esquerda: Boolean = True): string; overload;
+var
+  Negativo: Boolean;
+begin
+  Negativo := (Copy(Valor, 1, 1) = '-');
+  if Negativo then
+      Valor := StringReplace(Valor, '-', '', []);
+
+  Result := Copy(Valor, 1, Tamanho);
+
+  while Length(Result) < Tamanho do
+      Result := ifthen(Esquerda, '0' + Result, Result + '0');
+
+  if Negativo then
+      Result := '-' + Result;
+end;
+
+function Zeros(Valor: Int64; Tamanho: integer; Esquerda: Boolean = True): string; overload;
+begin
+  Result := Zeros(InttoStr(Valor), Tamanho, Esquerda);
+end;
 
 function TForm1.Conectar: Boolean;
 begin
@@ -222,7 +247,7 @@ begin
 end;
 
 
-procedure TForm1.Button1Click(Sender: TObject);
+procedure TForm1.btnCarregarClick(Sender: TObject);
 begin
   if Conectar() then begin
 
@@ -235,7 +260,6 @@ begin
       CarregaClientes();
       ReceberMensagens();
       ReceberArquivos();
-      ProcessaBoletosRec();
 
       FDConnection1.Commit;
 
@@ -253,6 +277,33 @@ begin
     end;
   end;
 
+end;
+
+procedure TForm1.btnProcBoletoClick(Sender: TObject);
+begin
+  if Conectar() then begin
+
+    try
+
+      FDConnection1.StartTransaction;
+
+      ProcessaBoletosRec();
+
+      FDConnection1.Commit;
+
+    except
+      on E: Exception do begin
+
+        if FDConnection1.InTransaction then begin
+
+          AddMsgLog('Error: ' + E.Message);
+
+          FDConnection1.Rollback;
+        end;
+      end;
+
+    end;
+  end;
 end;
 
 function TForm1.GetProximaSequencia(CDSequencia: string): Integer;
@@ -629,7 +680,7 @@ const
 
 var
   qryBoleto: TFDQuery;
-  qryArquivos, qryMensagens, qryExisteCliente, qryAtualizaMensagem, qryAtualizaArquivo: TFDQuery;
+  qryArquivos, qryMensagens, qryMensagemItem, qryExisteCliente, qryAtualizaMensagem, qryAtualizaArquivo: TFDQuery;
   iDML: Integer;
 
   i, iItem: Integer;
@@ -641,6 +692,7 @@ begin
   qryBoleto           := TFDQuery.Create(nil);
   qryArquivos         := TFDQuery.Create(nil);
   qryMensagens        := TFDQuery.Create(nil);
+  qryMensagemItem     := TFDQuery.Create(nil);
   qryExisteCliente    := TFDQuery.Create(nil);
   qryAtualizaMensagem := TFDQuery.Create(nil);
   qryAtualizaArquivo  := TFDQuery.Create(nil);
@@ -648,6 +700,7 @@ begin
     qryBoleto.Connection           := FDConnection1;
     qryArquivos.Connection         := FDConnection1;
     qryMensagens.Connection        := FDConnection1;
+    qryMensagemItem.Connection     := FDConnection1;
     qryExisteCliente.Connection    := FDConnection1;
     qryAtualizaMensagem.Connection := FDConnection1;
     qryAtualizaArquivo.Connection  := FDConnection1;
@@ -672,6 +725,14 @@ begin
     qryAtualizaMensagem.Params[ATLM_Situacao].DataType   := ftString;
     qryAtualizaMensagem.Params[ATLM_Situacao].Size       := 3;
     qryAtualizaMensagem.Prepare;
+
+    qryMensagemItem.SQL.Text :=
+      'SELECT IDMensagemItem, IDMensagem, IDMensagemPai, CDTag, Profundidade, ValorTag ' +
+      'FROM MensagemItem ' +
+      'WHERE IDMensagem = :IDMensagem';
+    qryMensagemItem.Params.BindMode    := pbByNumber;
+    qryMensagemItem.Params[0].DataType := ftInteger;
+    qryMensagemItem.Prepare;
 
     qryAtualizaArquivo.SQL.Text :=
       'UPDATE Arquivo ' +
@@ -790,6 +851,10 @@ begin
 
       if not qryExisteCliente.IsEmpty then begin
 
+        qryMensagemItem.Close;
+        qryMensagemItem.Params[0].AsInteger := qryMensagens.FieldByName('IDMensagem').AsInteger;
+        qryMensagemItem.Open();
+
         qryBoleto.Params.ArraySize := qryBoleto.Params.ArraySize + 1;
         iDML                       :=  qryBoleto.Params.ArraySize - 1;
 
@@ -841,6 +906,7 @@ begin
 
     AddLogInicio('Adicionando boletos originados de arquivo');
 
+    qryMensagens.Close;
     qryMensagens.Open(
       'SELECT IDArquivo ' +
       'FROM Arquivo ' +
@@ -865,6 +931,10 @@ begin
 
       if not qryExisteCliente.IsEmpty then begin
 
+        qryMensagemItem.Close;
+        qryMensagemItem.Params[0].AsInteger := qryMensagens.FieldByName('IDMensagem').AsInteger;
+        qryMensagemItem.Open();
+
         qryBoleto.Params.ArraySize := qryBoleto.Params.ArraySize + 1;
         iDML                       :=  qryBoleto.Params.ArraySize - 1;
 
@@ -874,12 +944,12 @@ begin
         qryBoleto.Params[IDArquivoRec].AsIntegers[iDML]  := qryMensagens.FieldByName('IDArquivo').AsInteger;
         qryBoleto.Params[LinhaDigitavel].AsStrings[iDML] := Zeros(iItem * 11, 35);
         qryBoleto.Params[CodBarras].AsStrings[iDML]      := Zeros(iItem * 12, 41);
-        qryBoleto.Params[Valor].AsBCDs[iDML]             := iDML * 2.98;
+        qryBoleto.Params[Valor].AsBCDs[iDML]             := 0.98;
         qryBoleto.Params[CDProduto].AsStrings[iDML]      := 'MCP';
         qryBoleto.Params[NMProduto].AsStrings[iDML]      := 'Alguma coisa';
         qryBoleto.Params[DSProduto].AsStrings[iDML]      := 'Descricao do produto';
         qryBoleto.Params[Observacoes].AsStrings[iDML]    := 'As observações vão aqui haha';
-        qryBoleto.Params[DTVencimento].AsIntegers[iDML]  := StrToInt(FormatDateTime('yyyymmdd', IncDay(Now, iDML)));
+        qryBoleto.Params[DTVencimento].AsIntegers[iDML]  := StrToInt(FormatDateTime('yyyymmdd', IncDay(Now, 1)));
         qryBoleto.Params[Juros].AsBCDs[iDML]             := 0.46;
 
         if (iItem + 1 mod 2) = 0 then begin
@@ -913,6 +983,7 @@ begin
     FreeAndNil(qryBoleto);
     FreeAndNil(qryArquivos);
     FreeAndNil(qryMensagens);
+    FreeAndNil(qryMensagemItem);
     FreeAndNil(qryExisteCliente);
     FreeAndNil(qryAtualizaMensagem);
     FreeAndNil(qryAtualizaArquivo);

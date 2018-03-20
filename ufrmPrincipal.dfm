@@ -17,14 +17,14 @@ object Form1: TForm1
     528)
   PixelsPerInch = 96
   TextHeight = 13
-  object Button1: TButton
-    Left = 258
-    Top = 128
+  object btnCarregar: TButton
+    Left = 12
+    Top = 126
     Width = 75
     Height = 25
     Caption = 'Carregar'
     TabOrder = 0
-    OnClick = Button1Click
+    OnClick = btnCarregarClick
   end
   object edtServer: TLabeledEdit
     Left = 12
@@ -86,6 +86,15 @@ object Form1: TForm1
     ReadOnly = True
     ScrollBars = ssBoth
     TabOrder = 5
+  end
+  object btnProcBoleto: TButton
+    Left = 90
+    Top = 126
+    Width = 75
+    Height = 25
+    Caption = 'Boletos'
+    TabOrder = 6
+    OnClick = btnProcBoletoClick
   end
   object FDConnection1: TFDConnection
     Params.Strings = (
