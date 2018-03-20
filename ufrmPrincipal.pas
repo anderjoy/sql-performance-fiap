@@ -13,7 +13,7 @@ uses
 
 type
   TForm1 = class(TForm)
-    Button1: TButton;
+    btnCarregar: TButton;
     edtServer: TLabeledEdit;
     edtUsername: TLabeledEdit;
     edtPassword: TLabeledEdit;
@@ -22,7 +22,9 @@ type
     FDGUIxWaitCursor1: TFDGUIxWaitCursor;
     FDPhysMSSQLDriverLink1: TFDPhysMSSQLDriverLink;
     Memo1: TMemo;
-    procedure Button1Click(Sender: TObject);
+    btnProcBoleto: TButton;
+    procedure btnCarregarClick(Sender: TObject);
+    procedure btnProcBoletoClick(Sender: TObject);
   private
     xTime: TStopWatch;
 
@@ -54,7 +56,7 @@ var
 implementation
 
 uses
-  FireDAC.Stan.Param, JDFuncoes, System.DateUtils;
+  FireDAC.Stan.Param, System.StrUtils, System.DateUtils;
 
 {$R *.dfm}
 
@@ -64,6 +66,29 @@ const
   TOTAL_CLIENTE      : Integer = 10000;
   TOTAL_MENSAGEM     : Integer = 10000;
   TOTAL_MSGITEMPORMSG: Integer = 7;
+
+
+function Zeros(Valor: string; Tamanho: integer; Esquerda: Boolean = True): string; overload;
+var
+  Negativo: Boolean;
+begin
+  Negativo := (Copy(Valor, 1, 1) = '-');
+  if Negativo then
+      Valor := StringReplace(Valor, '-', '', []);
+
+  Result := Copy(Valor, 1, Tamanho);
+
+  while Length(Result) < Tamanho do
+      Result := ifthen(Esquerda, '0' + Result, Result + '0');
+
+  if Negativo then
+      Result := '-' + Result;
+end;
+
+function Zeros(Valor: Int64; Tamanho: integer; Esquerda: Boolean = True): string; overload;
+begin
+  Result := Zeros(InttoStr(Valor), Tamanho, Esquerda);
+end;
 
 function TForm1.Conectar: Boolean;
 begin
@@ -222,7 +247,7 @@ begin
 end;
 
 
-procedure TForm1.Button1Click(Sender: TObject);
+procedure TForm1.btnCarregarClick(Sender: TObject);
 begin
   if Conectar() then begin
 
@@ -235,7 +260,6 @@ begin
       CarregaClientes();
       ReceberMensagens();
       ReceberArquivos();
-      ProcessaBoletosRec();
 
       FDConnection1.Commit;
 
@@ -253,6 +277,33 @@ begin
     end;
   end;
 
+end;
+
+procedure TForm1.btnProcBoletoClick(Sender: TObject);
+begin
+  if Conectar() then begin
+
+    try
+
+      FDConnection1.StartTransaction;
+
+      ProcessaBoletosRec();
+
+      FDConnection1.Commit;
+
+    except
+      on E: Exception do begin
+
+        if FDConnection1.InTransaction then begin
+
+          AddMsgLog('Error: ' + E.Message);
+
+          FDConnection1.Rollback;
+        end;
+      end;
+
+    end;
+  end;
 end;
 
 function TForm1.GetProximaSequencia(CDSequencia: string): Integer;
@@ -850,7 +901,6 @@ begin
     AddLogFim(qryBoleto.Params.ArraySize.ToString());
 
     qryBoleto.Params.ArraySize := 0;
-    Exit;
 
     //-------------------------------------------------------------------------\\
 
