@@ -1,11 +1,11 @@
-delete Boleto
-delete Cliente
-delete Sequencia
-delete Monitor
-delete MensagemItem
-delete Mensagem
-delete Arquivo
-delete Situacao
+delete Boleto;
+delete Cliente;
+delete Sequencia;
+delete Monitor;
+delete MensagemItem;
+delete Mensagem;
+delete Arquivo;
+delete Situacao;
 
 INSERT INTO SITUACAO VALUES ('CI9', 'Cliente incluido com sucesso');
 INSERT INTO SITUACAO VALUES ('MR9', 'Mensagem recebida com sucesso');
