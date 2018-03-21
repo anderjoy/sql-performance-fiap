@@ -36,11 +36,11 @@ WHERE EnvioRecebimento = 'R'
   AND SITUACAO         = 'AR9'
 
 --Atualiza o boleto para enviado via mensagem
-UPDATE BOLETO SET SITUACAO      = :SITUACAO, 
-                  IDMensagemEnv = :IDMensagemEnv 
-WHERE NRBOLETO  = :NRBOLETO 
-  AND TPCLIENTE = :TPCLIENTE 
-  AND CPFCNPJ   = :CPFCNPJ;
+UPDATE BOLETO SET SITUACAO      = @SITUACAO, 
+                  IDMensagemEnv = @IDMensagemEnv 
+WHERE NRBOLETO  = @NRBOLETO 
+  AND TPCLIENTE = @TPCLIENTE 
+  AND CPFCNPJ   = @CPFCNPJ;
 
 --Lista todos os boletos para envio por mensagem
 SELECT * 
@@ -50,11 +50,11 @@ WHERE IDMensagemRec IS NOT NULL
   AND Cancelado = 'N'
 
 --Atualiza o boleto para envio via arquivo
-UPDATE BOLETO SET SITUACAO     = :SITUACAO, 
-                  IDArquivoEnv = :IDArquivoEnv 
-WHERE NRBOLETO  = :NRBOLETO 
-  AND TPCLIENTE = :TPCLIENTE 
-  AND CPFCNPJ   = :CPFCNPJ;
+UPDATE BOLETO SET SITUACAO     = @SITUACAO, 
+                  IDArquivoEnv = @IDArquivoEnv 
+WHERE NRBOLETO  = @NRBOLETO 
+  AND TPCLIENTE = @TPCLIENTE 
+  AND CPFCNPJ   = @CPFCNPJ;
 
 --Lista todos os boletos para envio via arquivo
 SELECT * 
