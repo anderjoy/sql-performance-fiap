@@ -130,17 +130,27 @@ object Form1: TForm1
       'Password=fiap123'
       'Server=ajesus.ddns.net,3312'
       'DriverID=MSSQL')
-    Left = 276
-    Top = 45
+    Left = 364
+    Top = 69
   end
   object FDGUIxWaitCursor1: TFDGUIxWaitCursor
     Provider = 'Forms'
     ScreenCursor = gcrHourGlass
-    Left = 276
-    Top = 5
+    Left = 364
+    Top = 13
   end
   object FDPhysMSSQLDriverLink1: TFDPhysMSSQLDriverLink
-    Left = 276
-    Top = 21
+    Left = 500
+    Top = 13
+  end
+  object FDConnection2: TFDConnection
+    Params.Strings = (
+      'Database=PERFORMANCE'
+      'User_Name=fiap'
+      'Password=fiap123'
+      'Server=ajesus.ddns.net,3312'
+      'DriverID=MSSQL')
+    Left = 500
+    Top = 69
   end
 end

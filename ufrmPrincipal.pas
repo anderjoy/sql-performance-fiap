@@ -26,6 +26,7 @@ type
     btnPagar: TButton;
     btnEnvBoleto: TButton;
     btnEnvBltArqv: TButton;
+    FDConnection2: TFDConnection;
     procedure btnCarregarClick(Sender: TObject);
     procedure btnProcBoletoClick(Sender: TObject);
     procedure btnPagarClick(Sender: TObject);
@@ -53,7 +54,10 @@ type
     procedure AddLogFim(Msg: String);
 
     procedure GravarMonitor(CDMensagem: string; Mensagem: string; Prioridade: Integer = 1);
+
     function GetProximaSequencia(CDSequencia: string): Integer;
+    function AlocarSequencia(CDSequencia: string; Quantidade: Integer): Integer;
+
     function GetYearMonthDayAsString: string;
   public
     { Public declarations }
@@ -111,6 +115,13 @@ begin
   FDConnection1.Params.Values['Password']  := edtPassword.Text;
   FDConnection1.Params.Values['Server']    := edtServer.Text;
   FDConnection1.Open();
+
+  FDConnection2.Close;
+  FDConnection2.Params.Values['Database']  := edtDatabase.Text;
+  FDConnection2.Params.Values['User_Name'] := edtUsername.Text;
+  FDConnection2.Params.Values['Password']  := edtPassword.Text;
+  FDConnection2.Params.Values['Server']    := edtServer.Text;
+  FDConnection2.Open();
 
   Result := True;
 end;
@@ -407,45 +418,105 @@ var
 begin
   Result := 1;
 
-  qryGetProximaSequencia := TFDQuery.Create(nil);
+  FDConnection2.StartTransaction;
   try
-    qryGetProximaSequencia.Connection := FDConnection1;
 
-    qryGetProximaSequencia.ExecSQL(
-      'UPDATE SEQUENCIA SET VALOR = VALOR + 1 ' +
-      'WHERE CDSEQUENCIA = ' + QuotedStr(CDSequencia)
-    );
+    qryGetProximaSequencia := TFDQuery.Create(nil);
+    try
+      qryGetProximaSequencia.Connection := FDConnection2;
 
-    if qryGetProximaSequencia.RowsAffected = 1 then begin
-
-      qryGetProximaSequencia.Open(
-        'SELECT VALOR ' +
-        'FROM SEQUENCIA ' +
+      qryGetProximaSequencia.ExecSQL(
+        'UPDATE SEQUENCIA SET VALOR = VALOR + 1 ' +
         'WHERE CDSEQUENCIA = ' + QuotedStr(CDSequencia)
       );
 
-      Result := qryGetProximaSequencia.Fields[0].AsInteger;
+      if qryGetProximaSequencia.RowsAffected = 1 then begin
 
-    end else begin
+        qryGetProximaSequencia.Open(
+          'SELECT VALOR ' +
+          'FROM SEQUENCIA ' +
+          'WHERE CDSEQUENCIA = ' + QuotedStr(CDSequencia)
+        );
 
-      qryGetProximaSequencia.ExecSQL(
+        Result := qryGetProximaSequencia.Fields[0].AsInteger;
 
-        'INSERT INTO Sequencia ' +
-        ' (CDSequencia, ' +
-        '  DTSequencia, ' +
-        '  Valor, ' +
-        '  Situacao) ' +
-        'VALUES ' +
-        ' (' + QuotedStr(CDSequencia) + ', ' +
-        '  ' + GetYearMonthDayAsString() + ', ' +
-        '  ' + '1' + ', ' +
-        '  ' + QuotedStr('A') + ')'
+      end else begin
 
-      );
+        qryGetProximaSequencia.ExecSQL(
+
+          'INSERT INTO Sequencia ' +
+          ' (CDSequencia, ' +
+          '  DTSequencia, ' +
+          '  Valor, ' +
+          '  Situacao) ' +
+          'VALUES ' +
+          ' (' + QuotedStr(CDSequencia) + ', ' +
+          '  ' + GetYearMonthDayAsString() + ', ' +
+          '  ' + '1' + ', ' +
+          '  ' + QuotedStr('A') + ')'
+
+        );
+      end;
+
+    finally
+      FreeAndNil(qryGetProximaSequencia);
     end;
-
   finally
-    FreeAndNil(qryGetProximaSequencia);
+    FDConnection2.Commit;
+  end;
+end;
+
+function TForm1.AlocarSequencia(CDSequencia: string; Quantidade: Integer): Integer;
+var
+  qryAlocarSequencia: TFDQuery;
+begin
+  Result := 1;
+
+  FDConnection2.StartTransaction;
+  try
+
+    qryAlocarSequencia := TFDQuery.Create(nil);
+    try
+      qryAlocarSequencia.Connection := FDConnection2;
+
+      qryAlocarSequencia.ExecSQL(
+        'UPDATE SEQUENCIA SET VALOR = VALOR + 1 + ' + Quantidade.ToString() + ' ' +
+        'WHERE CDSEQUENCIA = ' + QuotedStr(CDSequencia)
+      );
+
+      if qryAlocarSequencia.RowsAffected = 1 then begin
+
+        qryAlocarSequencia.Open(
+          'SELECT VALOR ' +
+          'FROM SEQUENCIA ' +
+          'WHERE CDSEQUENCIA = ' + QuotedStr(CDSequencia)
+        );
+
+        Result := qryAlocarSequencia.Fields[0].AsInteger - Quantidade;
+
+      end else begin
+
+        qryAlocarSequencia.ExecSQL(
+
+          'INSERT INTO Sequencia ' +
+          ' (CDSequencia, ' +
+          '  DTSequencia, ' +
+          '  Valor, ' +
+          '  Situacao) ' +
+          'VALUES ' +
+          ' (' + QuotedStr(CDSequencia) + ', ' +
+          '  ' + GetYearMonthDayAsString() + ', ' +
+          '  ' + Quantidade.ToString() + ', ' +
+          '  ' + QuotedStr('A') + ')'
+
+        );
+      end;
+
+    finally
+      FreeAndNil(qryAlocarSequencia);
+    end;
+  finally
+    FDConnection2.Commit;
   end;
 end;
 
@@ -580,7 +651,7 @@ const
 
 var
   qryMensagem, qryMensagemItem: TFDQuery;
-  i, iItem, iIndexItem: Integer;
+  i, iItem, iIndexItem, iSeqMsg, iSeqMsgItem: Integer;
 begin
 
   qryMensagem     := TFDQuery.Create(nil);
@@ -646,10 +717,13 @@ begin
 
     iIndexItem := 0;
 
+    iSeqMsg     := AlocarSequencia('MENSAGEM', TOTAL_MENSAGEM);
+    iSeqMsgItem := AlocarSequencia('MSGITEM' , TOTAL_MENSAGEM * TOTAL_MSGITEMPORMSG);
+
     AddLogInicio('Adicionando mensagens');
     for I := 0 to TOTAL_MENSAGEM - 1 do begin
 
-      qryMensagem.Params[MSG_IDMensagem].AsIntegers[i]      := GetProximaSequencia('MENSAGEM');
+      qryMensagem.Params[MSG_IDMensagem].AsIntegers[i]      := iSeqMsg;
       qryMensagem.Params[MSG_DHMensagem].AsLargeInts[i]     := StrToInt64(FormatDateTime('yyyymmddhhnnss', Now()));
       qryMensagem.Params[MSG_CDMensagem].AsStrings[i]       := 'REC' + IntToStr(I);
       qryMensagem.Params[MSG_EnvioRecebimento].AsStrings[i] := 'R';
@@ -657,14 +731,17 @@ begin
 
       for iItem := 0 to TOTAL_MSGITEMPORMSG - 1 do begin
 
-        qryMensagemItem.Params[ITEM_IDMensagemItem].AsIntegers[iIndexItem] := GetProximaSequencia('MSGITEM');
+        qryMensagemItem.Params[ITEM_IDMensagemItem].AsIntegers[iIndexItem] := iSeqMsgItem;
         qryMensagemItem.Params[ITEM_IDMensagem].AsIntegers[iIndexItem]     := qryMensagem.Params[MSG_IDMensagem].AsIntegers[i];
         qryMensagemItem.Params[ITEM_CDTag].AsStrings[iIndexItem]           := 'Tag' + IntToStr(iItem);
         qryMensagemItem.Params[ITEM_Profundidade].AsIntegers[iIndexItem]   := 1;
         qryMensagemItem.Params[ITEM_ValorTag].AsStrings[iIndexItem]        := '<Tag' + IntToStr(iItem) + '> Algum conteudo qualquer ' + IntToStr(iItem) + '</Tag' + IntToStr(iItem) + '>';
 
         inc(iIndexItem);
+        Inc(iSeqMsgItem);
       end;
+
+      inc(iSeqMsg);
     end;
 
     qryMensagem.ResourceOptions.ArrayDMLSize     := MAX_ARRAYSIZE;
@@ -693,7 +770,7 @@ const
 
 var
   qryArquivo: TFDQuery;
-  i, iItem: Integer;
+  i, iItem, iSeqArquivo: Integer;
 
   TPPessoa: string;
 begin
@@ -742,10 +819,12 @@ begin
 
     qryArquivo.Params.ArraySize := TOTAL_MENSAGEM;
 
+    iSeqArquivo := AlocarSequencia('ARQUIVO', TOTAL_MENSAGEM);
+
     AddLogInicio('Adicionando arquivos');
     for I := 0 to TOTAL_MENSAGEM - 1 do begin
 
-      qryArquivo.Params[IDArquivo].AsIntegers[i]       := GetProximaSequencia('ARQUIVO');
+      qryArquivo.Params[IDArquivo].AsIntegers[i]       := iSeqArquivo;
       qryArquivo.Params[Path].AsStrings[i]             := 'C:\ARQV_REC\Connect';
       qryArquivo.Params[FileName].AsStrings[i]         := 'ARQ_REC_' + IntToStr(i) + '.xml';
       qryArquivo.Params[ConteudoXML].AsMemos[i]        := '<Tag' + IntToStr(iItem) + '> Algum conteudo qualquer ' + IntToStr(iItem) + '</Tag' + IntToStr(iItem) + '>';
@@ -753,6 +832,8 @@ begin
       qryArquivo.Params[TPArquivo].AsStrings[i]        := 'AREC' + IntToStr(I);
       qryArquivo.Params[EnvioRecebimento].AsStrings[i] := 'R';
       qryArquivo.Params[Situacao].AsStrings[i]         := 'AR9';
+
+      Inc(iSeqArquivo);
     end;
 
     qryArquivo.ResourceOptions.ArrayDMLSize := MAX_ARRAYSIZE;
